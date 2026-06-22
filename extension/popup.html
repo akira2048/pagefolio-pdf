@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Pagefolio PDF</title>
+    <link rel="stylesheet" href="popup.css">
+  </head>
+  <body>
+    <main class="panel">
+      <header class="header">
+        <div class="mark" aria-hidden="true">P</div>
+        <div>
+          <h1>Pagefolio PDF</h1>
+          <p id="tabTitle">現在のタブをPDFに保存</p>
+        </div>
+      </header>
+
+      <section class="section">
+        <label class="label" for="layoutMode">レイアウト</label>
+        <select id="layoutMode">
+          <option value="paged">ページ区切り</option>
+          <option value="single">1枚の長いページ</option>
+        </select>
+      </section>
+
+      <section class="grid">
+        <label class="field">
+          <span>用紙</span>
+          <select id="pageSize">
+            <option value="A4">A4</option>
+            <option value="Letter">Letter</option>
+            <option value="Legal">Legal</option>
+          </select>
+        </label>
+
+        <label class="field">
+          <span>向き</span>
+          <select id="orientation">
+            <option value="portrait">縦</option>
+            <option value="landscape">横</option>
+          </select>
+        </label>
+      </section>
+
+      <section class="grid">
+        <label class="field">
+          <span>余白</span>
+          <select id="margin">
+            <option value="default">標準</option>
+            <option value="none">なし</option>
+            <option value="narrow">狭い</option>
+          </select>
+        </label>
+
+        <label class="field">
+          <span>表示</span>
+          <select id="media">
+            <option value="screen">画面に近く</option>
+            <option value="print">印刷用</option>
+          </select>
+        </label>
+      </section>
+
+      <section class="section">
+        <label class="check">
+          <input id="printBackground" type="checkbox" checked>
+          <span>背景色と画像を含める</span>
+        </label>
+        <label class="check">
+          <input id="displayHeaderFooter" type="checkbox">
+          <span>タイトルとURLを入れる</span>
+        </label>
+        <label class="check">
+          <input id="chooseLocation" type="checkbox" checked>
+          <span>保存時に場所を選ぶ</span>
+        </label>
+      </section>
+
+      <section class="section">
+        <label class="label" for="scale">拡大率 <span id="scaleValue">100%</span></label>
+        <input id="scale" type="range" min="60" max="120" step="5" value="100">
+      </section>
+
+      <button id="saveButton" type="button">PDFを保存</button>
+      <p id="status" role="status"></p>
+    </main>
+    <script src="popup.js"></script>
+  </body>
+</html>

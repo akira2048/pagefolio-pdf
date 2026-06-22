@@ -1,0 +1,30 @@
+{
+  "manifest_version": 3,
+  "name": "Pagefolio PDF",
+  "short_name": "Pagefolio",
+  "description": "Save the current web page as a clean, selectable PDF.",
+  "version": "0.2.0",
+  "icons": {
+    "16": "icons/icon-16.png",
+    "32": "icons/icon-32.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
+  "action": {
+    "default_title": "Pagefolio PDF",
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "32": "icons/icon-32.png"
+    }
+  },
+  "background": {
+    "service_worker": "service_worker.js"
+  },
+  "permissions": [
+    "activeTab",
+    "debugger",
+    "downloads",
+    "storage"
+  ]
+}
