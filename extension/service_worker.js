@@ -12,8 +12,24 @@ const MARGINS = {
 
 const CSS_PIXELS_PER_INCH = 96;
 const MAX_SINGLE_PAGE_INCHES = 200;
+const SINGLE_PAGE_FIT_PADDING_INCHES = 0.2;
+const SINGLE_PAGE_HEADER_FOOTER_MARGIN_INCHES = 0.35;
 const MIN_PRINT_SCALE = 0.1;
 const MAX_PRINT_SCALE = 2;
+const SINGLE_PAGE_STYLE_ID = "pagefolio-single-page-print-fix";
+const SINGLE_PAGE_STYLE_CSS = `
+*, *::before, *::after {
+  break-before: auto !important;
+  break-after: auto !important;
+  break-inside: auto !important;
+  page-break-before: auto !important;
+  page-break-after: auto !important;
+  page-break-inside: auto !important;
+}
+@page {
+  margin: 0;
+}
+`;
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message.type !== "CREATE_PDF") return false;
@@ -28,6 +44,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 async function createPdf(message) {
   const debuggee = { tabId: message.tabId };
   let attached = false;
+  let injectedSinglePageStyle = false;
 
   try {
     await attach(debuggee);
@@ -35,6 +52,11 @@ async function createPdf(message) {
 
     const media = message.options.media === "print" ? "print" : "screen";
     await sendCommand(debuggee, "Emulation.setEmulatedMedia", { media });
+
+    if (message.options.layoutMode === "single") {
+      await addSinglePageStyle(debuggee);
+      injectedSinglePageStyle = true;
+    }
 
     const { pdfOptions, notice } = await buildPdfOptions(debuggee, message.options);
     const result = await sendCommand(debuggee, "Page.printToPDF", pdfOptions);
@@ -50,6 +72,9 @@ async function createPdf(message) {
     };
   } finally {
     if (attached) {
+      if (injectedSinglePageStyle) {
+        await removeSinglePageStyle(debuggee).catch(() => undefined);
+      }
       await detach(debuggee).catch(() => undefined);
     }
   }
@@ -75,10 +100,19 @@ async function buildSinglePageOptions(debuggee, options) {
   const contentWidth = Math.max(contentSize.width / CSS_PIXELS_PER_INCH, 1);
   const contentHeight = Math.max(contentSize.height / CSS_PIXELS_PER_INCH, 1);
   const requestedScale = clamp(Number(options.scale) || 1, MIN_PRINT_SCALE, MAX_PRINT_SCALE);
+  const marginTop = options.displayHeaderFooter ? SINGLE_PAGE_HEADER_FOOTER_MARGIN_INCHES : 0;
+  const marginBottom = options.displayHeaderFooter ? SINGLE_PAGE_HEADER_FOOTER_MARGIN_INCHES : 0;
+  const availableWidth = MAX_SINGLE_PAGE_INCHES - SINGLE_PAGE_FIT_PADDING_INCHES;
+  const availableHeight = MAX_SINGLE_PAGE_INCHES - marginTop - marginBottom - SINGLE_PAGE_FIT_PADDING_INCHES;
+
+  if (availableWidth <= 0 || availableHeight <= 0) {
+    return null;
+  }
+
   const maxScaleForPage = Math.min(
     requestedScale,
-    MAX_SINGLE_PAGE_INCHES / contentWidth,
-    MAX_SINGLE_PAGE_INCHES / contentHeight
+    availableWidth / contentWidth,
+    availableHeight / contentHeight
   );
 
   if (maxScaleForPage < MIN_PRINT_SCALE) {
@@ -86,8 +120,8 @@ async function buildSinglePageOptions(debuggee, options) {
   }
 
   const scale = clamp(maxScaleForPage, MIN_PRINT_SCALE, requestedScale);
-  const paperWidth = contentWidth * scale;
-  const paperHeight = contentHeight * scale;
+  const paperWidth = fitPaperInches(contentWidth * scale + SINGLE_PAGE_FIT_PADDING_INCHES);
+  const paperHeight = fitPaperInches(contentHeight * scale + marginTop + marginBottom + SINGLE_PAGE_FIT_PADDING_INCHES);
   const wasScaledDown = scale < requestedScale;
 
   return {
@@ -98,8 +132,8 @@ async function buildSinglePageOptions(debuggee, options) {
       scale,
       paperWidth,
       paperHeight,
-      marginTop: options.displayHeaderFooter ? 0.35 : 0,
-      marginBottom: options.displayHeaderFooter ? 0.35 : 0,
+      marginTop,
+      marginBottom,
       marginLeft: 0,
       marginRight: 0,
       preferCSSPageSize: false,
@@ -165,6 +199,34 @@ function sendCommand(debuggee, method, params = {}) {
   });
 }
 
+function addSinglePageStyle(debuggee) {
+  return sendCommand(debuggee, "Runtime.evaluate", {
+    expression: `
+      (() => {
+        const id = ${JSON.stringify(SINGLE_PAGE_STYLE_ID)};
+        const css = ${JSON.stringify(SINGLE_PAGE_STYLE_CSS)};
+        document.getElementById(id)?.remove();
+        const style = document.createElement("style");
+        style.id = id;
+        style.textContent = css;
+        document.documentElement.appendChild(style);
+      })();
+    `,
+    awaitPromise: true
+  });
+}
+
+function removeSinglePageStyle(debuggee) {
+  return sendCommand(debuggee, "Runtime.evaluate", {
+    expression: `
+      (() => {
+        document.getElementById(${JSON.stringify(SINGLE_PAGE_STYLE_ID)})?.remove();
+      })();
+    `,
+    awaitPromise: true
+  });
+}
+
 function buildFilename(title, url) {
   const date = new Date().toISOString().slice(0, 10);
   const rawTitle = title || url || "webpage";
@@ -178,6 +240,10 @@ function buildFilename(title, url) {
 
 function clamp(value, min, max) {
   return Math.min(Math.max(value, min), max);
+}
+
+function fitPaperInches(value) {
+  return Math.min(MAX_SINGLE_PAGE_INCHES, Math.ceil(value * 1000) / 1000);
 }
 
 function formatError(error) {
